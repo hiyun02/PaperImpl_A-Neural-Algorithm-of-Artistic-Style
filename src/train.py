@@ -11,13 +11,16 @@ from PIL import Image
 from models import StyleTransfer
 from loss import ContentLoss, StyleLoss
 
-import os # 하이퍼파라미터 별 결과 저장용
-from tqdm import tqdm
+import os
+from tqdm import tqdm # 진행 표시줄
 
+# VGG19 모델 학습에 사용된 정규화 기준값
+# 사전학습된 VGG19 모델이 기대하는 입력 분포에 맞추기 위해 사용
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
-# Arrow를 통한 return type hinting
+# 이미지 전처리 함수
+# PIL 이미지 (h, w, c) -> torch.Tensor (b, c, h, w)
 def pre_processing(image:Image.Image) -> torch.Tensor:
     # 사전학습된 모델이 학습할 때 사용되었던 전처리기법을 학습 데이터에도 그대로 적용해야 함
     preprocessing = T.Compose([
@@ -25,22 +28,24 @@ def pre_processing(image:Image.Image) -> torch.Tensor:
         T.ToTensor(),
         T.Normalize(mean,std) # lambda x : (x-mean) / std
     ]) # (c, h, w)
-
-    # (1, c, h, w)
+    # 배치 차원 추가 (1, c, h, w)
     image_tensor:torch.Tensor = preprocessing(image).unsqueeze(0)
     return image_tensor
 
+# 이미지 후처리 함수
+# torch.Tensor (b, c, h, w) -> PIL 이미지 (h, w, c)
 def post_processing(tensor:torch.Tensor) -> Image.Image:
-    
-    # shape 1,c,h,w
+    # PIL은 Pytroch 텐서를 직접 처리할 수 없기 때문에, 텐서를 먼저 Numpy 배열로 변경해야함
+    # 텐서를 GPU에서 CPU로 이동시키고, 연산 그래프에서 분리(detach) 후 NumPy 배열로 변환
     image:np.ndarray = tensor.to('cpu').detach().numpy()
-    # shape c,h,w
+    # 배치 차원 제거 (c,h,w)
     image = image.squeeze()
-    # shape h,w,c
+    # PIL 이미지 형식에 맞도록 차원 순서 재배치 (h, w, c)
     image = image.transpose(1, 2, 0)
-    # de norm
+    # 정규화 복원
+    # 전처리 과정에서 정규화했던 것을 되돌림
     image = image*std + mean
-    # clip
+    # 복원 과정에서 발생한 이상값(음수 등)을 제거하기 위해 픽셀 값 범위를 [0, 255]로 되돌림
     image = image.clip(0, 1) * 255
     # dtype unit8
     image = image.astype(np.uint8)

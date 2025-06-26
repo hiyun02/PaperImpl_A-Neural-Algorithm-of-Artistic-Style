@@ -33,7 +33,7 @@ class StyleTransfer(nn.Module):
     # model(input)과 같은 호출 시, nn.Module 내부적으로 실행되는 self.__call__(input)이 self.foward(input)를 호출하는 구조 
     # 모델에 입력이 주어졌을 때 어떻게 처리할 지를 정의함
     # 스타일 혹은 콘텐츠 이미지 x를 vgg19 추출기에 통과시킨 후 각각의 손실 계산에 필요한 feature map을 리스트에 담아 반환함
-    # 입력된 이미지를 VGG19에 통과시키며, 지정된 계층에서의 feature map을 추출하여 반환 
+    # 입력된 이미지를 VGG19에 통과시키며, 지정된 계층에서의 feature map 집합(Tensor)을 추출하여 반환 
     def forward(self, x:torch.Tensor, mode:str):
         features = []
         # 스타일이미지인지, 콘텐츠이미지에 따라 추출할 계층의 인덱스를 선택
@@ -46,7 +46,7 @@ class StyleTransfer(nn.Module):
         # 이미지 x를 VGG19의 모든 feature 계층에 순서대로 통과시키며 업데이트
         for i in range(len(self.vgg19_model_features)):
             x = self.vgg19_model_features[i](x)
-            # 지정된 계층에 도달하면, 해당 feature map을 결과 리스트에 추가
+            # 지정된 계층에 도달하면, 해당 계층의 출력 텐서(여러 개의 feature map 포함)을 결과 리스트에 추가
             if i in selected_layers:
                 features.append(x)
         # 추출된 feature map을 담은 리스트 반환
